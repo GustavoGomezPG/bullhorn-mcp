@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <googleAnalyticsPage>/php/timesheet/create.php</googleAnalyticsPage>
+  <authenticationKey>REDACTED_JWT</authenticationKey>
+  <errorStatus>error</errorStatus>
+  <errorMessage>The timesheet you are attempting to create has already been created</errorMessage>
+</root>

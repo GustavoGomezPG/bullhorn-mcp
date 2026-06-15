@@ -1,0 +1,23 @@
+<!--
+  Representative snippet of the BBO /employee/ timesheet view, reconstructed from the
+  live DOM (2026-06-15). The 7 day rows live in <tbody id="timesheetDateData">; each row
+  carries timesheetdetailid + a MM/DD/YYYY date cell. The overall week status renders as
+  a label whose value follows `Status">`. The page JWT is exposed as
+  window.SESSION_AUTHENTICATION_KEY. Token values are redacted.
+-->
+<script>var SESSION_AUTHENTICATION_KEY = "REDACTED_JWT";</script>
+<div class="timesheetHeader">
+  <span class="timesheetStatusLabel">Status">In Progress</span>
+</div>
+<table class="timesheetWeek">
+  <thead><tr><th>Day</th><th>Worked</th><th>Total</th></tr></thead>
+  <tbody id="timesheetDateData">
+    <tr class="timesheetDay" timesheetdetailid="956338" style="cursor: pointer"><td>Sun 06/14/2026</td><td>0:00</td><td>0:00</td></tr>
+    <tr class="timesheetDay" timesheetdetailid="956339" style="cursor: pointer"><td>Mon 06/15/2026</td><td>2:00</td><td>2:00</td></tr>
+    <tr class="timesheetDay" timesheetdetailid="956340" style="cursor: pointer"><td>Tue 06/16/2026</td><td>0:00</td><td>0:00</td></tr>
+    <tr class="timesheetDay" timesheetdetailid="956341" style="cursor: pointer"><td>Wed 06/17/2026</td><td>0:00</td><td>0:00</td></tr>
+    <tr class="timesheetDay" timesheetdetailid="956342" style="cursor: pointer"><td>Thu 06/18/2026</td><td>0:00</td><td>0:00</td></tr>
+    <tr class="timesheetDay" timesheetdetailid="956343" style="cursor: pointer"><td>Fri 06/19/2026</td><td>0:00</td><td>0:00</td></tr>
+    <tr class="timesheetDay" timesheetdetailid="956344" style="cursor: pointer"><td>Sat 06/20/2026</td><td>0:00</td><td>0:00</td></tr>
+  </tbody>
+</table>
