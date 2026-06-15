@@ -12,6 +12,24 @@
 
 ---
 
+## ⚠️ DESIGN UPDATE (post-discovery, 2026-06-15) — read before implementing
+
+Live reverse-engineering (see `docs/DISCOVERY.md` + `tests/fixtures/`) corrected two assumptions. **These override the original task text below where they conflict:**
+
+1. **The week's day-ids are NOT loadable via `create.php`.** `create.php` is create-only (errors "already been created" if the week exists; see `create-week-exists.xml`) and `getTimesheet.php` 404s. The 7 day rows (`<tr class="timesheetDay" timesheetdetailid="N"><td>…MM/DD/YYYY…</td>…</tr>`) and the status (`Status">In Progress`) are rendered into the **authenticated post-login `/employee/` landing page**. A plain XHR `GET /employee/?date=` returns the shell with **no** rows.
+   - ➡️ Replace the planned `parseWeek` (XML) with **`parseWeekHtml(html)`** in a new module **`src/bullhorn/page.ts`** (+ test against `tests/fixtures/employee-week.html`). It returns `{ status, timesheetId?, days: [{date: 'YYYY-MM-DD', timesheetdetailId}] }` (convert `MM/DD/YYYY`→`YYYY-MM-DD`).
+   - ➡️ `src/bullhorn/auth.ts` `login()` returns **`{ jwt, landingHtml }`** (the landing page yields both the JWT and the current week). `resolveAuthKey` stays for the `BULLHORN_AUTH_KEY` override path, but the override path has no landing HTML — see scope note.
+   - ➡️ `src/bullhorn/timesheet.ts` exposes **`loadCurrentWeek(landingHtml)`** (parse via `page.ts`) instead of an XML `ensureWeek`. `create.php` is used only as a best-effort "create if the landing page shows no week" step.
+   - ➡️ Drop `parseWeek` from `xml.ts` (keep `tag`/`parseDay`). Task 5's `parseWeek` test/impl move to `page.ts` as `parseWeekHtml` (HTML, not XML).
+
+2. **Scope v1 = CURRENT WEEK ONLY** (user decision: "current week and daily updates"). The day/week tools operate on the week present in the post-login landing page (the current week). If a requested `date` falls outside the loaded current week, return a clear error telling the user past-week backfill isn't supported headlessly yet (documented follow-up). The `BULLHORN_AUTH_KEY` override path (no landing HTML) therefore can't load the week by itself — when used, tools error asking the user to allow auto-login (which provides the landing HTML) for week loading.
+
+3. **HTTP 209 is normal.** BBO PHP endpoints return **209** for both success and app-level errors. Treat 209 as OK at the HTTP layer; decide success/failure from `<errorStatus>` (`okay` vs `error`) + `<errorMessage>`. Only 401/403 (and other non-2xx besides 209/200) are auth/transport failures. Update `client.ts` accordingly (the original `!res.ok` check would wrongly reject 209).
+
+Everything else in the plan (scaffold, vendored Blitzit layer, period, time helpers, `parseDay`, client JWT rotation, assignment resolver, pure `plan.ts`, tool surface, README, preview/confirm/never-submit/dedup safety) stands.
+
+---
+
 ## File Structure
 
 - `package.json`, `tsconfig.json`, `.env.example`, `.gitignore` (exists) — scaffold.
