@@ -25,12 +25,40 @@ Block fields (1-based index): `timesheetBlockId` (empty for new), `timesheetBloc
 
 `authenticationKey` is a BBO JWT (sub=staff id, vanity=provisionsgroup) that **expires (~48 h)**.
 
+## Discovery results (confirmed live in-browser 2026-06-15)
+
+- **Login:** `POST https://provisionsgroup.bbo.bullhornstaffing.com/Login/` (form-encoded) with `process=login`, `flashEnabled=true`, `username`, `password`, `rememberMe`. On success it sets session cookies and redirects to `/employee/?authenticationKey=<hex>` where `<hex>` is a **one-time handoff key** (reusing it on a fresh load bounces back to `/Login/`).
+- **JWT acquisition:** the `/employee/` page embeds the JWT as the JS global `window.SESSION_AUTHENTICATION_KEY` (also present in page HTML). The page also exposes `window.Assignment.assignmentId` (= **6599**, single assignment confirmed — `assignments.length === 1`) and `window.Timesheet.timesheetId` (the week's id).
+- **JWT rotation:** every `/php/timesheet/*.php` response is **XML** and contains a fresh `<authenticationKey>…</authenticationKey>` — chain it into the next request.
+- **`getTimesheetDay.php` response** (XML):
+  ```xml
+  <timesheet>
+    <isHoliday>no</isHoliday>
+    <maxCheckinId>357267</maxCheckinId>
+    <timesheetdetailsid>956339</timesheetdetailsid>
+    <timesheetdates>2026-06-15</timesheetdates>
+    <timesheetdateFormatted>Mon 06/15/2026</timesheetdateFormatted>
+    <hoursworked>2:00</hoursworked>
+    <totalHours>2:00</totalHours>
+    <blocks><block>
+      <id>0</id><timesheetBlockId>357263</timesheetBlockId>
+      <date>2026-06-15</date><hours>2</hours><minutes>0</minutes>
+      <checkin>12:00 am</checkin><checkout>12:00 am</checkout>
+      <note>notes</note><projectId></projectId><type>0</type><editable>yes</editable>
+    </block></blocks>
+    <authenticationKey>…fresh JWT…</authenticationKey>
+    <errorStatus>okay</errorStatus>
+  </timesheet>
+  ```
+  To preserve an existing block on `updateDay.php`, resend it with its `timesheetBlockId`; new blocks use an empty `timesheetBlockId`.
+- **Week boundaries:** **Sunday → Saturday** (observed period `06/14/2026 – 06/20/2026`). Timesheet status text (e.g. `In Progress`) is shown in the UI; the status used by the guard comes from the create/load response (shape to confirm — see below).
+
 ## Decisions (from brainstorm)
 
-1. **Auth:** auto-login from credentials — reverse-engineer the BBO login to mint the JWT from username/password. A `BULLHORN_AUTH_KEY` env override is supported as a fallback if login is SSO/captcha-gated.
+1. **Auth:** auto-login from credentials (confirmed feasible — plain form POST, no SSO/captcha): `POST /Login/` → load `/employee/` → scrape `window.SESSION_AUTHENTICATION_KEY` (the JWT) from the page, then chain the refreshed `<authenticationKey>` returned by each API call. A `BULLHORN_AUTH_KEY` env override remains as a manual fallback.
 2. **Source of truth:** Blitzit (re-read completed tasks, same as the Accelo MCP). The Blitzit-read layer is vendored into this repo for independence.
-3. **Assignments:** a default `BULLHORN_ASSIGNMENT_ID` (single-assignment case) plus an optional `config/bullhorn-assignment-map.json` (Blitzit project → assignmentId) override for multiple assignments.
-4. **Discovery-first:** capture the exact shapes of login, week-load, and day responses before building on them.
+3. **Assignments:** a default `BULLHORN_ASSIGNMENT_ID` (= 6599; single assignment confirmed) plus an optional `config/bullhorn-assignment-map.json` (Blitzit project → assignmentId) override for multiple assignments.
+4. **Discovery-first:** done in-browser (see Discovery results). One contract remains to confirm at implementation time — the `create.php` response (how the 7 day `timesheetdetailId`s + timesheet status come back, and the exact `periodEndDate` value to pass).
 
 ## Hard rules (carried from tatui-sync)
 
@@ -128,15 +156,16 @@ Hours/minutes from Blitzit `timeTaken` ms: `hours = floor(sec/3600)`, `minutes =
 - Tools: preview-vs-confirm, never-submit (no submit endpoint referenced).
 - No live network in tests.
 
-## Discovery-first (plan's Task 1)
+## Discovery — status
 
-Before implementing against assumptions, capture from live (browser network capture and/or read-only calls with a valid `authenticationKey`):
+Done in-browser on 2026-06-15 (see "Discovery results" above): login flow, JWT acquisition + rotation, `getTimesheetDay.php` XML shape, block fields, single assignment (6599), and Sun–Sat week boundaries are all confirmed.
 
-1. **BBO login** request/response — endpoint, payload, where the JWT comes back. Fallback to `BULLHORN_AUTH_KEY` env if SSO/captcha-gated.
-2. **Week load / `create.php` response** — how day `timesheetdetailId`s and the timesheet **status** are returned.
-3. **`periodEndDate` semantics & week boundaries** (sample `26-06-15` is a Monday; reconcile with the prior Sun–Sat observation) and whether **`updateDay.php` replaces or appends** the day's blocks.
+**One contract remains to confirm at implementation time** (plan's Task 1), via a single read-only `create.php` call (the week already exists, so `subaction=Blank` should return the existing week idempotently — verify it does not duplicate):
 
-The plan pins these shapes down first; later tasks build against the confirmed contracts.
+1. **`create.php` response** — how the 7 day `timesheetdetailId`s and the timesheet **status** are returned, and the exact **`periodEndDate`** value to pass (the displayed period end is Sat `06/20`, but the captured sample used `26-06-15`; determine whether the param is the Saturday end, the period, or a reference date the server snaps to the Sun–Sat week).
+2. Whether **`updateDay.php` replaces or appends** the day's blocks (we send the full day set incl. existing blocks regardless, so this is a safety confirmation).
+
+Until confirmed, `timesheet.ts` builds the day-id map and status from the `create.php` response behind a small adapter so only that parser changes once the shape is pinned.
 
 ## Out of scope (v1)
 
