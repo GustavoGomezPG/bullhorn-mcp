@@ -2,7 +2,7 @@ import type { BullhornConfig } from "../config.js";
 import { text } from "../util.js";
 import { resolveAuth } from "../bullhorn/auth.js";
 import { createBullhornClient } from "../bullhorn/client.js";
-import { loadCurrentWeek, getDay, updateDay, assertEditable } from "../bullhorn/timesheet.js";
+import { loadCurrentWeek, getDay, updateDay, assertEditable, createWeek } from "../bullhorn/timesheet.js";
 import { bullhornWeek } from "../bullhorn/period.js";
 import { getBlitzitAuth } from "../blitzit/auth.js";
 import { createBlitzitClient } from "../blitzit/client.js";
@@ -22,17 +22,31 @@ export async function runBullhornSync(
   const today = epochMsToDateInTz(Date.now(), tz);
   const ref = opts.date ?? today;
   const targetWeek = bullhornWeek(ref);
+  const authArgs = {
+    authKeyOverride: config.authKeyOverride, vanity: config.vanity, username: config.username, password: config.password,
+  };
 
   // 1) Auth + landing page (the current week's day list lives here).
-  const auth = await resolveAuth({
-    authKeyOverride: config.authKeyOverride, vanity: config.vanity, username: config.username, password: config.password,
-  });
+  let auth = await resolveAuth(authArgs);
   if (!auth.landingHtml) {
     return text({ error: "BULLHORN_AUTH_KEY override cannot load the timesheet week. Set BULLHORN_USERNAME/PASSWORD so the MCP can read the landing page." });
   }
-  const week = loadCurrentWeek(auth.landingHtml);
+  let week = loadCurrentWeek(auth.landingHtml);
   if (week.days.length === 0) {
-    return text({ error: "No timesheet week found on the BBO landing page. Open BBO, make sure this week's timesheet exists, then retry." });
+    // BBO only renders day rows once the current week's blank timesheet exists.
+    // Create it (no-op if it already exists), then re-login to reload the landing page.
+    // The landing page only ever shows the current week, so we always create the current week.
+    const currentWeek = bullhornWeek(today);
+    const bootstrap = createBullhornClient({ authKey: auth.jwt }, config.vanity);
+    await createWeek(bootstrap, config.assignmentId, currentWeek.periodEndDate, config.timezoneOffset);
+    auth = await resolveAuth(authArgs);
+    if (!auth.landingHtml) {
+      return text({ error: "Created the Bullhorn week but the auth override cannot reload the landing page. Set BULLHORN_USERNAME/PASSWORD." });
+    }
+    week = loadCurrentWeek(auth.landingHtml);
+    if (week.days.length === 0) {
+      return text({ error: "Created the Bullhorn week but its day rows still didn't load from the landing page. Open BBO and verify the timesheet, then retry." });
+    }
   }
   const loadedStart = week.days[0].date;
   const loadedEnd = week.days[week.days.length - 1].date;
