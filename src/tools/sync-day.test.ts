@@ -2,12 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const landingHtml = readFileSync(join(process.cwd(), "tests/fixtures/employee-week.html"), "utf8");
+// getData.php is the source of truth for the week's day rows (the landing page no
+// longer renders them). The mocked BBO client returns this week XML for every postForm.
+const getDataXml = readFileSync(join(process.cwd(), "tests/fixtures/getdata-week.xml"), "utf8");
 
-vi.mock("../bullhorn/auth.js", () => ({ resolveAuth: vi.fn(async () => ({ jwt: "jwt", landingHtml })) }));
+vi.mock("../bullhorn/auth.js", () => ({ resolveAuth: vi.fn(async () => ({ jwt: "jwt", landingHtml: null })) }));
 vi.mock("../blitzit/auth.js", () => ({ getBlitzitAuth: vi.fn(async () => ({ idToken: "t", uid: "u" })) }));
 vi.mock("../blitzit/client.js", () => ({ createBlitzitClient: vi.fn(() => ({ queryTasksByOwner: vi.fn() })) }));
-vi.mock("../bullhorn/client.js", () => ({ createBullhornClient: vi.fn(() => ({ postForm: vi.fn() })) }));
+vi.mock("../bullhorn/client.js", () => ({ createBullhornClient: vi.fn(() => ({ postForm: vi.fn(async () => getDataXml) })) }));
 
 const jun15 = Date.UTC(2026, 5, 15, 16, 0, 0); // 09:00 PDT -> 2026-06-15
 vi.mock("../blitzit/tasks.js", () => ({

@@ -12,9 +12,14 @@ export interface SyncPlan {
 }
 
 function note(t: BlitzitTask): string {
-  const topic = t.topic || "General";
-  const detail = t.detail || t.topic || t.project;
-  return `${t.project} :: ${topic} :: ${detail}`;
+  const topic = t.topic.trim();
+  const detail = t.detail.trim();
+  // Blitzit titles already encode `Client::SubProject::Description`, so use the title
+  // as-is. Only apply the `project :: topic :: description` form when the task carries a
+  // genuine description distinct from its title (otherwise the title gets duplicated).
+  return detail && detail !== t.project
+    ? `${t.project} :: ${topic || "General"} :: ${detail}`
+    : t.project;
 }
 
 export function planBullhornSync(params: {

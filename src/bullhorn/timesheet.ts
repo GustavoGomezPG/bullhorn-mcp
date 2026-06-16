@@ -1,7 +1,7 @@
 import type { BullhornClient } from "./client.js";
 import { BullhornError } from "./client.js";
 import { parseDay, type Block, type DayData } from "./xml.js";
-import { parseWeekHtml, type WeekData } from "./page.js";
+import { parseWeekHtml, parseWeekXml, type WeekData } from "./page.js";
 
 const EDITABLE_STATUSES = new Set(["", "not created", "in progress"]);
 
@@ -23,6 +23,19 @@ export function assertEditable(status: string): void {
 /** Parse the current week's day list + status from the post-login landing HTML. */
 export function loadCurrentWeek(landingHtml: string): WeekData {
   return parseWeekHtml(landingHtml);
+}
+
+/**
+ * Fetch a week's day list + status from BBO's getData.php. This is the source of
+ * truth for day rows — the landing page no longer renders them (it loads them
+ * client-side from this same endpoint). `periodEndDate` is the week's Saturday in
+ * `yy-mm-dd` form (e.g. "26-06-20"). Zero days means the week isn't created yet.
+ */
+export async function fetchWeek(
+  client: BullhornClient, assignmentId: string, periodEndDate: string,
+): Promise<WeekData> {
+  const xml = await client.postForm("/php/timesheet/getData.php", { assignmentId, periodEndDate });
+  return parseWeekXml(xml);
 }
 
 export async function getDay(client: BullhornClient, timesheetdetailId: string): Promise<DayData> {

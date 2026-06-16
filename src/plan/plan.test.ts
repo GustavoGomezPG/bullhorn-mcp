@@ -27,8 +27,8 @@ describe("planBullhornSync", () => {
     expect(plan.days).toHaveLength(0);
     expect(plan.skippedDuplicates).toEqual([{ date: "2026-06-08", note: "Datamax :: Web :: did x" }]);
   });
-  it("fills empty topic/detail so the note is always 3-part", () => {
+  it("uses the title as-is when there is no real description (no duplication)", () => {
     const plan = planBullhornSync({ tasks: [task("a", 60, "", "")], tz: TZ, existingKeys: new Set() });
-    expect(plan.days[0].blocks[0].note).toBe("Datamax :: General :: Datamax");
+    expect(plan.days[0].blocks[0].note).toBe("Datamax");
   });
 });

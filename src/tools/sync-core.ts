@@ -2,7 +2,7 @@ import type { BullhornConfig } from "../config.js";
 import { text } from "../util.js";
 import { resolveAuth } from "../bullhorn/auth.js";
 import { createBullhornClient } from "../bullhorn/client.js";
-import { loadCurrentWeek, getDay, updateDay, assertEditable, createWeek } from "../bullhorn/timesheet.js";
+import { fetchWeek, getDay, updateDay, assertEditable, createWeek } from "../bullhorn/timesheet.js";
 import { bullhornWeek } from "../bullhorn/period.js";
 import { getBlitzitAuth } from "../blitzit/auth.js";
 import { createBlitzitClient } from "../blitzit/client.js";
@@ -26,26 +26,21 @@ export async function runBullhornSync(
     authKeyOverride: config.authKeyOverride, vanity: config.vanity, username: config.username, password: config.password,
   };
 
-  // 1) Auth + landing page (the current week's day list lives here).
-  let auth = await resolveAuth(authArgs);
-  if (!auth.landingHtml) {
-    return text({ error: "BULLHORN_AUTH_KEY override cannot load the timesheet week. Set BULLHORN_USERNAME/PASSWORD so the MCP can read the landing page." });
-  }
-  let week = loadCurrentWeek(auth.landingHtml);
+  // 1) Auth → JWT, then load the week from getData.php. BBO no longer server-renders
+  //    day rows into the landing page (it loads them client-side from getData.php), so
+  //    we hit that endpoint directly. This also lets the BULLHORN_AUTH_KEY override work,
+  //    since we no longer need the post-login landing HTML to read day rows.
+  const auth = await resolveAuth(authArgs);
+  const bbo = createBullhornClient({ authKey: auth.jwt }, config.vanity);
+  const periodEndDate = bullhornWeek(today).periodEndDate; // landing page is current-week only
+  let week = await fetchWeek(bbo, config.assignmentId, periodEndDate);
   if (week.days.length === 0) {
-    // BBO only renders day rows once the current week's blank timesheet exists.
-    // Create it (no-op if it already exists), then re-login to reload the landing page.
-    // The landing page only ever shows the current week, so we always create the current week.
-    const currentWeek = bullhornWeek(today);
-    const bootstrap = createBullhornClient({ authKey: auth.jwt }, config.vanity);
-    await createWeek(bootstrap, config.assignmentId, currentWeek.periodEndDate, config.timezoneOffset);
-    auth = await resolveAuth(authArgs);
-    if (!auth.landingHtml) {
-      return text({ error: "Created the Bullhorn week but the auth override cannot reload the landing page. Set BULLHORN_USERNAME/PASSWORD." });
-    }
-    week = loadCurrentWeek(auth.landingHtml);
+    // Week not created yet — create the blank timesheet (no-op if it already exists),
+    // then re-fetch. The JWT rotates inside the client across these calls.
+    await createWeek(bbo, config.assignmentId, periodEndDate, config.timezoneOffset);
+    week = await fetchWeek(bbo, config.assignmentId, periodEndDate);
     if (week.days.length === 0) {
-      return text({ error: "Created the Bullhorn week but its day rows still didn't load from the landing page. Open BBO and verify the timesheet, then retry." });
+      return text({ error: "Created the Bullhorn week but getData.php returned no day rows. Open BBO and verify the timesheet, then retry." });
     }
   }
   const loadedStart = week.days[0].date;
@@ -63,9 +58,6 @@ export async function runBullhornSync(
   const targetDates = opts.mode === "day" ? [ref] : week.days.map((d) => d.date);
   const confirm = !!opts.confirm;
   if (confirm) assertEditable(week.status); // throws StatusGuardError if the week is locked/submitted/approved
-
-  const session = { authKey: auth.jwt };
-  const bbo = createBullhornClient(session, config.vanity);
 
   // 3) Blitzit done-tasks across the week window, then bucket by tz date.
   const { idToken, uid } = await getBlitzitAuth();
