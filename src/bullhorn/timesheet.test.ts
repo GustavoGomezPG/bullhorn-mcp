@@ -71,13 +71,14 @@ describe("status guard", () => {
   it("accepts editable statuses", () => {
     expect(isEditableStatus("In Progress")).toBe(true);
     expect(isEditableStatus("Not Created")).toBe(true);
-    expect(isEditableStatus("")).toBe(true);
     expect(() => assertEditable("In Progress")).not.toThrow();
   });
-  it("rejects non-editable statuses", () => {
+  it("rejects non-editable statuses, including an empty/unparsed status", () => {
     expect(isEditableStatus("Approved")).toBe(false);
+    expect(isEditableStatus("")).toBe(false);
     expect(() => assertEditable("Approved")).toThrow(StatusGuardError);
     expect(() => assertEditable("Submitted")).toThrow(StatusGuardError);
+    expect(() => assertEditable("")).toThrow(StatusGuardError);
   });
 });
 

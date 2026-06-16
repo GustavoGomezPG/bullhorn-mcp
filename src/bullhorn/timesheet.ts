@@ -3,7 +3,11 @@ import { BullhornError } from "./client.js";
 import { parseDay, type Block, type DayData } from "./xml.js";
 import { parseWeekHtml, parseWeekXml, type WeekData } from "./page.js";
 
-const EDITABLE_STATUSES = new Set(["", "not created", "in progress"]);
+// Only these timesheet statuses may be written to. An empty/unparsed status is
+// NOT editable: the old Playwright sync (tatui-sync) refused on an empty status
+// rather than risk writing to a sheet whose real state it couldn't read, and
+// getData.php now returns a reliable status, so empty signals an anomaly.
+const EDITABLE_STATUSES = new Set(["not created", "in progress"]);
 
 export class StatusGuardError extends Error {
   constructor(public status: string) {
