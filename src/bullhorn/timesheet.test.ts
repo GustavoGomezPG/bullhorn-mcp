@@ -1,7 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { getDay, updateDay, buildBlockFields, loadCurrentWeek, createWeek, assertEditable, isEditableStatus, StatusGuardError } from "./timesheet.js";
+import { getDay, updateDay, buildBlockFields, createWeek, assertEditable, isEditableStatus, StatusGuardError } from "./timesheet.js";
 import { BullhornError } from "./client.js";
 import type { BullhornClient } from "./client.js";
 
@@ -20,15 +18,6 @@ function makeClient(responses: Array<string | Error>) {
 }
 
 const DAY_XML = `<timesheet><maxCheckinId>999</maxCheckinId><timesheetdetailsid>956339</timesheetdetailsid><timesheetdates>2026-06-15</timesheetdates><hoursworked>2:00</hoursworked><blocks><block><timesheetBlockId>357263</timesheetBlockId><hours>2</hours><minutes>0</minutes><note>old</note><type>0</type><editable>yes</editable></block></blocks><errorStatus>okay</errorStatus></timesheet>`;
-
-describe("loadCurrentWeek", () => {
-  it("parses the landing-page week", () => {
-    const html = readFileSync(join(process.cwd(), "tests/fixtures/employee-week.html"), "utf8");
-    const w = loadCurrentWeek(html);
-    expect(w.days).toHaveLength(7);
-    expect(w.status).toBe("In Progress");
-  });
-});
 
 describe("getDay", () => {
   it("parses a day via the client", async () => {

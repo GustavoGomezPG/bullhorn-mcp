@@ -1,7 +1,7 @@
 import type { BullhornClient } from "./client.js";
 import { BullhornError } from "./client.js";
 import { parseDay, type Block, type DayData } from "./xml.js";
-import { parseWeekHtml, parseWeekXml, type WeekData } from "./page.js";
+import { parseWeekXml, type WeekData } from "./page.js";
 
 // Only these timesheet statuses may be written to. An empty/unparsed status is
 // NOT editable: the old Playwright sync (tatui-sync) refused on an empty status
@@ -22,11 +22,6 @@ export function isEditableStatus(status: string): boolean {
 
 export function assertEditable(status: string): void {
   if (!isEditableStatus(status)) throw new StatusGuardError(status);
-}
-
-/** Parse the current week's day list + status from the post-login landing HTML. */
-export function loadCurrentWeek(landingHtml: string): WeekData {
-  return parseWeekHtml(landingHtml);
 }
 
 /**

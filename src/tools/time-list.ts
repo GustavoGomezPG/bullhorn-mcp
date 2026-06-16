@@ -2,7 +2,9 @@ import type { BullhornConfig } from "../config.js";
 import { text } from "../util.js";
 import { resolveAuth } from "../bullhorn/auth.js";
 import { createBullhornClient } from "../bullhorn/client.js";
-import { loadCurrentWeek, getDay } from "../bullhorn/timesheet.js";
+import { fetchWeek, getDay } from "../bullhorn/timesheet.js";
+import { bullhornWeek } from "../bullhorn/period.js";
+import { epochMsToDateInTz } from "../bullhorn/time.js";
 
 export function buildListTimeTool(config: BullhornConfig) {
   return {
@@ -13,12 +15,12 @@ export function buildListTimeTool(config: BullhornConfig) {
       const auth = await resolveAuth({
         authKeyOverride: config.authKeyOverride, vanity: config.vanity, username: config.username, password: config.password,
       });
-      if (!auth.landingHtml) {
-        return text({ error: "BULLHORN_AUTH_KEY override cannot load the timesheet week. Set BULLHORN_USERNAME/PASSWORD so the MCP can read the landing page." });
-      }
-      const week = loadCurrentWeek(auth.landingHtml);
-      if (week.days.length === 0) return text({ error: "No timesheet week found on the BBO landing page." });
       const bbo = createBullhornClient({ authKey: auth.jwt }, config.vanity);
+      // Day rows come from getData.php (the landing page no longer renders them);
+      // this also lets the BULLHORN_AUTH_KEY override work for read-only listing.
+      const today = epochMsToDateInTz(Date.now(), config.workdayTz);
+      const week = await fetchWeek(bbo, config.assignmentId, bullhornWeek(today).periodEndDate);
+      if (week.days.length === 0) return text({ error: "No current Bullhorn timesheet week found (getData.php returned no day rows)." });
       const days: any[] = [];
       for (const d of week.days) {
         const day = await getDay(bbo, d.timesheetdetailId);
