@@ -16,6 +16,22 @@ export interface DayData {
   errorStatus: string | null;
 }
 
+/**
+ * Decode the XML entities BBO uses in text fields (notes especially). BBO returns notes
+ * entity-encoded (e.g. `R&amp;D`); decoding here keeps parsed notes identical to the plain
+ * text the planner produces, so day+note dedup matches across syncs. `&amp;` is decoded last
+ * to avoid double-decoding (e.g. `&amp;lt;` → `&lt;`, not `<`).
+ */
+export function decodeEntities(s: string): string {
+  return s
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
 export function tag(xml: string, name: string): string | null {
   const m = xml.match(new RegExp(`<${name}>([\\s\\S]*?)</${name}>`, "i"));
   return m ? m[1] : null;
@@ -30,7 +46,7 @@ export function parseDay(xml: string): DayData {
     timesheetBlockId: (tag(b, "timesheetBlockId") ?? "").trim() || undefined,
     hours: num(tag(b, "hours")),
     minutes: num(tag(b, "minutes")),
-    note: (tag(b, "note") ?? "").trim(),
+    note: decodeEntities((tag(b, "note") ?? "").trim()),
     type: num(tag(b, "type")),
     editable: (tag(b, "editable") ?? "").trim().toLowerCase() === "yes",
   }));

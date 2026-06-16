@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { tag, parseDay } from "./xml.js";
+import { tag, parseDay, decodeEntities } from "./xml.js";
 
 const dayXml = readFileSync(join(process.cwd(), "tests/fixtures/get-day.xml"), "utf8");
 
@@ -24,5 +24,17 @@ describe("parseDay", () => {
   });
   it("extracts the refreshed authenticationKey when present", () => {
     expect(parseDay("<timesheet><authenticationKey>abc</authenticationKey></timesheet>").authenticationKey).toBe("abc");
+  });
+  it("decodes XML entities in block notes so dedup matches the planner's plain text", () => {
+    const xml = "<timesheet><blocks><block><note>Sales &amp; Marketing :: R&amp;D :: a &lt;b&gt; &quot;c&quot;</note><hours>1</hours><minutes>0</minutes><type>0</type><editable>yes</editable></block></blocks></timesheet>";
+    expect(parseDay(xml).blocks[0].note).toBe('Sales & Marketing :: R&D :: a <b> "c"');
+  });
+});
+
+describe("decodeEntities", () => {
+  it("decodes the common XML entities without double-decoding", () => {
+    expect(decodeEntities("a &amp; b")).toBe("a & b");
+    expect(decodeEntities("&lt;x&gt; &quot;q&quot; &#39;y&#39;")).toBe('<x> "q" \'y\'');
+    expect(decodeEntities("&amp;lt;")).toBe("&lt;"); // escaped entity stays escaped
   });
 });
