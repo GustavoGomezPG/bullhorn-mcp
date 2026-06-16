@@ -45,4 +45,23 @@ describe("login", () => {
     expect(calls[1].url).toContain("/employee/?authenticationKey=HEX");
     expect(calls[1].init.headers.Cookie).toContain("SESSIONID=abc");
   });
+
+  it("resolves a protocol-relative redirect location (real BBO form)", async () => {
+    const calls: any[] = [];
+    globalThis.fetch = vi.fn(async (url: any) => {
+      calls.push({ url: String(url) });
+      if (String(url).endsWith("/Login/")) {
+        const h = new Headers({
+          location: "//v.bbo.bullhornstaffing.com/employee/?authenticationKey=HEX",
+        });
+        h.append("set-cookie", "SESSIONID=abc; Path=/");
+        return new Response("", { status: 301, headers: h });
+      }
+      return new Response(`<script>var SESSION_AUTHENTICATION_KEY = "eyJ0.body.sig";</script>`, { status: 200 });
+    }) as any;
+    const r = await login("v", "u", "p");
+    expect(r.jwt).toBe("eyJ0.body.sig");
+    // must NOT double up the host into a malformed URL
+    expect(calls[1].url).toBe("https://v.bbo.bullhornstaffing.com/employee/?authenticationKey=HEX");
+  });
 });

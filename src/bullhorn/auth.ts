@@ -28,9 +28,9 @@ export async function login(vanity: string, username: string, password: string):
   }
   const cookies = parseSetCookie(res.headers);
   const location = res.headers.get("location");
-  const landingUrl = location
-    ? (location.startsWith("http") ? location : `${baseUrl}${location.startsWith("/") ? "" : "/"}${location}`)
-    : `${baseUrl}/employee/`;
+  // Resolve against baseUrl: handles absolute (http…), path-absolute (/employee…),
+  // and protocol-relative (//host/employee…) — BBO sends the last form.
+  const landingUrl = location ? new URL(location, baseUrl).toString() : `${baseUrl}/employee/`;
   const landing = await fetch(landingUrl, { headers: cookies ? { Cookie: cookies } : {} });
   const landingHtml = await landing.text();
   const jwt = extractJwtFromHtml(landingHtml);
