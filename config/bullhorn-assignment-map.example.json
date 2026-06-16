@@ -1,0 +1,4 @@
+{
+  "__comment": "Optional. Only needed if different Blitzit projects post to different Bullhorn assignments. Otherwise BULLHORN_ASSIGNMENT_ID covers everything.",
+  "Datamax": 6599
+}
